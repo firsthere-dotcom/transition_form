@@ -27,11 +27,34 @@ function app() {
     modules: window.MODULES,
 
     // ---------------------------------------------------------------
-    init() {
+    async init() {
       const loaded = window.Storage.load();
       if (loaded) this.db = Object.assign(window.emptyDb(), loaded);
-      this.route();
-      // Persist whenever db changes deeply isn't automatic with Alpine; we call persist() explicitly on mutations.
+
+      if (window.Backend && window.Backend.isConfigured()) {
+        let live = false;
+        try {
+          live = await window.Backend.initAuth(this);
+        } catch (e) {
+          console.warn("initAuth failed", e);
+        }
+        if (!live) {
+          // No live session. Keep a local demo session if present, else sign in.
+          if (this.db.settings.demoMode && this.db.session) {
+            this.route();
+          } else {
+            this.db.session = null;
+            this.db.activeUserId = null;
+            this.view = "signin";
+          }
+        }
+      } else {
+        this.route();
+      }
+    },
+
+    get isLive() {
+      return !!(window.Backend && window.Backend.isConfigured()) && !this.db.settings.demoMode;
     },
 
     persist() {
@@ -76,6 +99,7 @@ function app() {
     // ---------------- auth (demo + real stub) ----------------
     signInDemo() {
       // Create a local user with no couple yet -> onboarding.
+      this.db.settings.demoMode = true;
       const id = window.uid();
       this.db.users[id] = {
         id,
@@ -100,11 +124,32 @@ function app() {
       }
     },
 
-    completeOnboarding() {
+    async completeOnboarding() {
       const me = this.me;
       if (!me) return;
-      me.name = this.onboard.name.trim();
-      me.birth_year = parseInt(this.onboard.birth_year, 10) || null;
+      const name = this.onboard.name.trim();
+      const birthYear = parseInt(this.onboard.birth_year, 10) || null;
+
+      if (this.isLive) {
+        try {
+          if (this.onboard.mode === "create") {
+            await window.Backend.createCouple(this, name, birthYear);
+          } else {
+            await window.Backend.joinCouple(this, name, birthYear, this.onboard.code.trim().toUpperCase());
+          }
+          this.view = "dashboard";
+        } catch (e) {
+          alert(
+            this.onboard.mode === "join"
+              ? "Couldn't join — check the invite code and try again."
+              : "Couldn't create your couple. Please try again."
+          );
+        }
+        return;
+      }
+
+      me.name = name;
+      me.birth_year = birthYear;
       if (this.onboard.mode === "create") {
         const couple = {
           id: window.uid(),
@@ -229,10 +274,14 @@ function app() {
     },
     autosave() {
       this.saveHint = "Saving…";
+      const moduleSlug = this.currentModuleSlug;
+      const exerciseSlug = this.currentExerciseSlug;
       if (this.saveTimer) clearTimeout(this.saveTimer);
-      this.saveTimer = setTimeout(() => {
+      this.saveTimer = setTimeout(async () => {
         this.persist();
-        if (window.Backend && window.Backend.syncResponses) window.Backend.syncResponses(this.db);
+        if (this.isLive) {
+          await window.Backend.upsertResponse(this, moduleSlug, exerciseSlug);
+        }
         this.saveHint = "Saved";
         setTimeout(() => {
           if (this.saveHint === "Saved") this.saveHint = "";
@@ -337,11 +386,16 @@ function app() {
         notstarted: "Not started",
       }[status];
     },
-    markDone() {
-      const r = this.ensureResponse(this.db.activeUserId, this.currentModuleSlug, this.currentExerciseSlug);
+    async markDone() {
+      const moduleSlug = this.currentModuleSlug;
+      const exerciseSlug = this.currentExerciseSlug;
+      const r = this.ensureResponse(this.db.activeUserId, moduleSlug, exerciseSlug);
       r.marked_done_at = new Date().toISOString();
       this.persist();
-      if (window.Backend && window.Backend.syncResponses) window.Backend.syncResponses(this.db);
+      if (this.isLive) {
+        await window.Backend.upsertResponse(this, moduleSlug, exerciseSlug);
+        await window.Backend.loadAll(this); // refresh partner done-flags
+      }
       this.goDashboard();
     },
     unmarkDone() {
@@ -385,7 +439,19 @@ function app() {
       if (!this.bothDone(moduleSlug)) return;
       this.openReveal(moduleSlug);
     },
-    ensureReveal(moduleSlug) {
+    async ensureReveal(moduleSlug) {
+      if (this.isLive) {
+        if (!this.db.reveals[moduleSlug]) {
+          const rev = await window.Backend.createReveal(this, moduleSlug);
+          if (rev) this.db.reveals[moduleSlug] = rev;
+          await window.Backend.loadAll(this); // partner answers now readable post-reveal
+        }
+        if (this.db.reveals[moduleSlug] && !this.db.reveals[moduleSlug].claude_response) {
+          await this.loadModuleObservations(moduleSlug);
+        }
+        return;
+      }
+      // demo
       if (!this.db.reveals[moduleSlug]) {
         this.db.reveals[moduleSlug] = {
           id: window.uid(),
@@ -395,6 +461,9 @@ function app() {
           claude_response: null,
         };
         this.persist();
+        this.loadModuleObservations(moduleSlug);
+      } else if (!this.db.reveals[moduleSlug].claude_response) {
+        // refresh retry (plan: no auto-retry, but a manual reopen may try again)
         this.loadModuleObservations(moduleSlug);
       }
     },
@@ -407,6 +476,9 @@ function app() {
             ? await window.Backend.revealObservations(moduleSlug, payload)
             : null;
         this.db.reveals[moduleSlug].claude_response = text || null;
+        if (this.isLive && text) {
+          await window.Backend.saveRevealObservation(this, moduleSlug, text);
+        }
       } catch (e) {
         console.warn("observations failed", e);
         this.db.reveals[moduleSlug].claude_response = null;
@@ -466,7 +538,7 @@ function app() {
     async addReflection(moduleSlug, exerciseSlug) {
       const text = (this.reflectionDrafts[exerciseSlug] || "").trim();
       if (!text) return;
-      const id = window.uid();
+      let id = window.uid();
       this.db.reflections[id] = {
         id,
         user_id: this.db.activeUserId,
@@ -478,14 +550,25 @@ function app() {
       };
       this.reflectionDrafts[exerciseSlug] = "";
       this.persist();
+
+      if (this.isLive) {
+        const row = await window.Backend.insertReflection(this, exerciseSlug, text);
+        if (row) {
+          delete this.db.reflections[id];
+          this.db.reflections[row.id] = row;
+          id = row.id;
+        }
+      }
+
       // fire Claude reflection observation (graceful if unavailable)
       try {
         if (window.Backend && window.Backend.reflectionObservations) {
           const payload = this.buildReflectionPayload(moduleSlug, exerciseSlug);
           const text2 = await window.Backend.reflectionObservations(exerciseSlug, payload);
-          if (text2) {
+          if (text2 && this.db.reflections[id]) {
             this.db.reflections[id].claude_response = text2;
             this.persist();
+            if (this.isLive) await window.Backend.saveReflectionObservation(id, text2);
           }
         }
       } catch (e) {
@@ -530,7 +613,12 @@ function app() {
     },
 
     // ---------------- sign out / reset ----------------
-    signOut() {
+    async signOut() {
+      if (this.isLive && window.Backend.signOut) {
+        await window.Backend.signOut();
+      }
+      window.Storage.clear();
+      this.db = window.emptyDb();
       this.db.session = null;
       this.db.activeUserId = null;
       this.view = "signin";
