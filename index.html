@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rich Life Planner</title>
+    <meta
+      name="description"
+      content="A couples' web app for designing the second half of life together."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <div x-data="app()" x-init="init()" x-cloak>
+      <!-- =================== TOP BAR =================== -->
+      <template x-if="view !== 'signin'">
+        <header class="topbar">
+          <div class="brand" @click="goDashboard()">Rich Life Planner</div>
+          <div class="row" style="gap: 0.75rem">
+            <!-- demo: acting-as switcher -->
+            <template x-if="isDemo && couple && coupleMembers().length > 1">
+              <label class="muted" style="display: flex; align-items: center; gap: 0.4rem">
+                Acting as:
+                <select
+                  @change="switchActiveUser($event.target.value)"
+                  style="font-family: inherit; padding: 0.3rem; border-radius: 8px; border: 1px solid var(--border)"
+                >
+                  <template x-for="u in coupleMembers()" :key="u.id">
+                    <option :value="u.id" :selected="u.id === db.activeUserId" x-text="u.name || 'You'"></option>
+                  </template>
+                </select>
+              </label>
+            </template>
+            <button class="btn btn-ghost" style="padding: 6px 14px; min-height: 0" @click="goArchive()">
+              Archive
+            </button>
+            <button class="btn btn-ghost" style="padding: 6px 14px; min-height: 0" @click="signOut()">
+              Sign out
+            </button>
+          </div>
+        </header>
+      </template>
+
+      <!-- =================== SIGN IN =================== -->
+      <template x-if="view === 'signin'">
+        <main class="signin-wrap stack">
+          <h1>Rich Life Planner</h1>
+          <p class="muted">
+            A space for two partners to design the second half of life together — answered
+            independently, revealed together.
+          </p>
+          <div class="stack" style="margin-top: 2rem">
+            <button class="google-btn" @click="signInGoogle()">
+              <span style="font-weight: 700">G</span> Sign in with Google
+            </button>
+            <button class="btn btn-ghost" @click="signInDemo()">Continue in demo mode</button>
+            <p class="muted" style="font-size: 13px">
+              Demo mode runs entirely in your browser — no account, no server. Perfect for trying the
+              full flow, including the reveal.
+            </p>
+          </div>
+        </main>
+      </template>
+
+      <!-- =================== ONBOARDING =================== -->
+      <template x-if="view === 'onboarding'">
+        <main class="app-shell stack" data-theme="purple">
+          <h1>Welcome</h1>
+          <p class="muted">
+            You and your partner each answer a series of reflective exercises on your own. When you've
+            both finished a module, you reveal your answers side by side.
+          </p>
+
+          <div class="card stack">
+            <div>
+              <label class="field-label" for="ob-name">Your name</label>
+              <input id="ob-name" type="text" x-model="onboard.name" placeholder="First name" />
+            </div>
+            <div>
+              <label class="field-label" for="ob-year">Birth year</label>
+              <input id="ob-year" type="number" x-model="onboard.birth_year" placeholder="e.g. 1978" />
+            </div>
+          </div>
+
+          <div class="card stack">
+            <div class="row" style="gap: 1.5rem">
+              <label class="row" style="gap: 0.4rem; cursor: pointer">
+                <input type="radio" value="create" x-model="onboard.mode" /> Create a couple
+              </label>
+              <label class="row" style="gap: 0.4rem; cursor: pointer">
+                <input type="radio" value="join" x-model="onboard.mode" /> Join with a code
+              </label>
+            </div>
+            <template x-if="onboard.mode === 'join'">
+              <div>
+                <label class="field-label" for="ob-code">Partner's invite code</label>
+                <input
+                  id="ob-code"
+                  type="text"
+                  x-model="onboard.code"
+                  maxlength="6"
+                  placeholder="6-character code"
+                  style="text-transform: uppercase; letter-spacing: 0.2em"
+                />
+              </div>
+            </template>
+            <p class="muted" x-show="onboard.mode === 'create'">
+              You'll get a 6-character invite code to share with your partner.
+            </p>
+          </div>
+
+          <div>
+            <button
+              class="btn btn-reveal"
+              :disabled="!onboard.name.trim() || !onboard.birth_year"
+              @click="completeOnboarding()"
+            >
+              Continue
+            </button>
+          </div>
+        </main>
+      </template>
+
+      <!-- =================== DASHBOARD =================== -->
+      <template x-if="view === 'dashboard'">
+        <main class="app-shell stack">
+          <!-- partners + invite code -->
+          <section class="card" data-theme="purple">
+            <div class="partners-row" style="justify-content: space-between">
+              <div class="partners-row">
+                <div class="partner-chip">
+                  <span class="avatar me" x-text="initials(me)"></span>
+                  <span x-text="(me && me.name) || 'You'"></span>
+                </div>
+                <template x-if="partner">
+                  <div class="partner-chip">
+                    <span class="avatar partner" x-text="initials(partner)"></span>
+                    <span x-text="partner.name"></span>
+                  </div>
+                </template>
+                <template x-if="!partner">
+                  <span class="muted">Waiting for your partner to join</span>
+                </template>
+              </div>
+            </div>
+            <template x-if="couple && !partner">
+              <div style="margin-top: 1rem">
+                <p class="muted" style="margin-bottom: 0.5rem">Share this invite code with your partner:</p>
+                <span class="invite-code" x-text="couple.invite_code"></span>
+                <template x-if="isDemo">
+                  <div style="margin-top: 1rem">
+                    <button class="btn btn-ghost" @click="addDemoPartner()">
+                      + Add a simulated partner (demo)
+                    </button>
+                  </div>
+                </template>
+              </div>
+            </template>
+          </section>
+
+          <!-- modules -->
+          <template x-for="mod in modules" :key="mod.slug">
+            <section class="module-card" :data-theme="mod.color">
+              <div class="module-accent-bar"></div>
+              <div class="module-head">
+                <div>
+                  <h2 x-text="'Module ' + mod.order + ' — ' + mod.name"></h2>
+                  <p class="muted" style="margin: 0">
+                    <span x-text="mod.subtitle"></span>
+                    <template x-if="mod.optional"><span> · optional</span></template>
+                  </p>
+                </div>
+                <span
+                  class="tag"
+                  :class="{
+                    'tag-done': moduleStatus(mod.slug) === 'revealed',
+                    'tag-ready': moduleStatus(mod.slug) === 'ready',
+                    'tag-progress': moduleStatus(mod.slug) === 'progress',
+                    'tag-notstarted': moduleStatus(mod.slug) === 'notstarted'
+                  }"
+                  x-text="statusLabel(moduleStatus(mod.slug)) + ' · ' + moduleProgressCount(mod.slug)"
+                ></span>
+              </div>
+
+              <p class="muted" style="font-size: 13px" x-text="mod.source"></p>
+
+              <ul class="exercise-list">
+                <template x-for="ex in mod.exercises" :key="ex.slug">
+                  <li class="exercise-row" @click="openExercise(mod.slug, ex.slug)">
+                    <span class="ex-num" x-text="ex.number"></span>
+                    <span class="ex-title" x-text="ex.title"></span>
+                    <span
+                      class="tag"
+                      :class="{
+                        'tag-done': exerciseStatus(mod.slug, ex.slug) === 'done' || exerciseStatus(mod.slug, ex.slug) === 'revealed',
+                        'tag-progress': exerciseStatus(mod.slug, ex.slug) === 'progress',
+                        'tag-notstarted': exerciseStatus(mod.slug, ex.slug) === 'notstarted'
+                      }"
+                      x-text="statusLabel(exerciseStatus(mod.slug, ex.slug))"
+                    ></span>
+                  </li>
+                </template>
+              </ul>
+
+              <!-- reveal CTA -->
+              <div style="margin-top: 1.25rem" data-theme="purple">
+                <template x-if="isRevealed(mod.slug)">
+                  <button class="btn btn-reveal" @click="openReveal(mod.slug)">
+                    See your revealed answers
+                  </button>
+                </template>
+                <template x-if="!isRevealed(mod.slug) && bothDone(mod.slug)">
+                  <div>
+                    <p class="banner banner-partner-done">You're both ready.</p>
+                    <button class="btn btn-reveal" @click="triggerReveal(mod.slug)">
+                      Reveal — see each other's answers
+                    </button>
+                  </div>
+                </template>
+                <template x-if="!isRevealed(mod.slug) && !bothDone(mod.slug) && moduleDoneBy(db.activeUserId, mod.slug) && partner">
+                  <p class="muted">You've finished this module. Waiting for your partner to finish theirs.</p>
+                </template>
+              </div>
+            </section>
+          </template>
+
+          <template x-if="isDemo">
+            <p class="muted" style="font-size: 12px; text-align: center">
+              Demo mode · <a href="#" @click.prevent="resetAll()">reset all local data</a>
+            </p>
+          </template>
+        </main>
+      </template>
+
+      <!-- =================== EXERCISE =================== -->
+      <template x-if="view === 'exercise' && currentExercise">
+        <main class="app-shell" :data-theme="currentModule.color">
+          <button class="btn btn-ghost" style="padding: 6px 14px; min-height: 0; margin-bottom: 1.5rem" @click="goDashboard()">
+            ← Dashboard
+          </button>
+
+          <!-- module section intro (first exercise only) -->
+          <template x-if="isFirstExerciseInModule">
+            <div class="intro-block">
+              <p x-text="currentModule.sectionIntro"></p>
+            </div>
+          </template>
+
+          <p class="muted" x-text="'Exercise ' + currentExercise.number"></p>
+          <h1 x-text="currentExercise.title"></h1>
+
+          <div class="exercise-intro">
+            <p x-text="currentExercise.intro"></p>
+          </div>
+
+          <!-- partner-done note -->
+          <template x-if="partnerDoneExercise(currentModuleSlug, currentExerciseSlug)">
+            <p class="banner banner-partner-done">Your partner has finished this one.</p>
+          </template>
+
+          <!-- inspiration prompts -->
+          <template x-if="inspirationVisible(currentModuleSlug, currentExerciseSlug)">
+            <div style="margin-bottom: 1.5rem">
+              <template x-for="(prompt, i) in currentExercise.inspiration" :key="i">
+                <div class="inspiration">
+                  <div style="flex: 1">
+                    <div class="insp-label">Inspiration</div>
+                    <div class="insp-text" x-text="prompt"></div>
+                  </div>
+                </div>
+              </template>
+              <div class="row" style="gap: 0.75rem; margin-top: -0.5rem">
+                <button class="btn btn-ghost" style="padding: 4px 12px; min-height: 0; font-size: 13px"
+                  @click="dismissInspiration(currentModuleSlug, currentExerciseSlug, false)">
+                  Hide for now
+                </button>
+                <button class="btn btn-ghost" style="padding: 4px 12px; min-height: 0; font-size: 13px"
+                  @click="dismissInspiration(currentModuleSlug, currentExerciseSlug, true)">
+                  Don't show these again
+                </button>
+              </div>
+            </div>
+          </template>
+
+          <!-- ===== TEXT exercise ===== -->
+          <template x-if="currentExercise.kind === 'text'">
+            <div>
+              <template x-for="q in currentExercise.required" :key="q.id">
+                <div class="question">
+                  <label class="field-label" :for="'req-' + q.id" x-text="q.prompt"></label>
+                  <textarea
+                    :id="'req-' + q.id"
+                    :value="answerValue(q.id, 'required')"
+                    @input="setAnswer(q.id, 'required', $event.target.value)"
+                    placeholder="Take your time…"
+                  ></textarea>
+                </div>
+              </template>
+
+              <!-- go deeper -->
+              <template x-if="currentExercise.optional.length">
+                <div class="go-deeper">
+                  <button class="go-deeper-toggle" @click="showDeeper = !showDeeper">
+                    <span x-text="showDeeper ? '▾' : '▸'"></span>
+                    Go deeper (optional)
+                  </button>
+                  <template x-if="showDeeper">
+                    <div>
+                      <hr class="go-deeper-divider" />
+                      <template x-for="q in currentExercise.optional" :key="q.id">
+                        <div class="question">
+                          <label class="field-label" :for="'opt-' + q.id" x-text="q.prompt"
+                            style="font-weight: 400; color: #555"></label>
+                          <textarea
+                            :id="'opt-' + q.id"
+                            :value="answerValue(q.id, 'optional')"
+                            @input="setAnswer(q.id, 'optional', $event.target.value)"
+                            style="min-height: 90px"
+                          ></textarea>
+                        </div>
+                      </template>
+                    </div>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </template>
+
+          <!-- ===== RANKING exercise (Money Dials) ===== -->
+          <template x-if="currentExercise.kind === 'ranking'">
+            <div>
+              <p x-text="currentExercise.rankingPrompt" style="font-weight: 700"></p>
+              <p class="muted" style="font-size: 13px">
+                Drag to reorder, use the ↑ ↓ buttons, or type a rank number. 1 = most important.
+              </p>
+              <ul class="rank-list">
+                <template x-for="(cat, i) in rankOrder()" :key="cat">
+                  <li
+                    class="rank-item"
+                    draggable="true"
+                    @dragstart="onDragStart(i)"
+                    @dragover.prevent
+                    @drop.prevent="onDrop(i)"
+                    :class="{ dragging: dragIndex === i }"
+                  >
+                    <span class="rank-handle" title="Drag to reorder">⠿</span>
+                    <span class="rank-number" x-text="i + 1"></span>
+                    <span class="rank-label" x-text="cat"></span>
+                    <input
+                      class="rank-input"
+                      type="number"
+                      min="1"
+                      :max="rankOrder().length"
+                      :value="i + 1"
+                      @change="setRankNumber(cat, $event.target.value)"
+                      :aria-label="'Rank for ' + cat"
+                    />
+                    <span style="display: flex; flex-direction: column">
+                      <button class="btn btn-ghost" style="padding: 0 8px; min-height: 0; line-height: 1.4"
+                        @click="moveRank(i, -1)" :disabled="i === 0" aria-label="Move up">↑</button>
+                      <button class="btn btn-ghost" style="padding: 0 8px; min-height: 0; line-height: 1.4"
+                        @click="moveRank(i, 1)" :disabled="i === rankOrder().length - 1" aria-label="Move down">↓</button>
+                    </span>
+                  </li>
+                </template>
+              </ul>
+
+              <template x-if="currentExercise.optional.length">
+                <div class="go-deeper">
+                  <button class="go-deeper-toggle" @click="showDeeper = !showDeeper">
+                    <span x-text="showDeeper ? '▾' : '▸'"></span> Go deeper (optional)
+                  </button>
+                  <template x-if="showDeeper">
+                    <div>
+                      <hr class="go-deeper-divider" />
+                      <template x-for="q in currentExercise.optional" :key="q.id">
+                        <div class="question">
+                          <label class="field-label" :for="'opt-' + q.id" x-text="q.prompt"
+                            style="font-weight: 400; color: #555"></label>
+                          <textarea
+                            :id="'opt-' + q.id"
+                            :value="answerValue(q.id, 'optional')"
+                            @input="setAnswer(q.id, 'optional', $event.target.value)"
+                            style="min-height: 90px"
+                          ></textarea>
+                        </div>
+                      </template>
+                    </div>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </template>
+
+          <!-- save hint + done -->
+          <div class="save-hint" x-text="saveHint"></div>
+          <div class="row" style="margin-top: 1.5rem; gap: 1rem">
+            <template x-if="!isDone(db.activeUserId, currentModuleSlug, currentExerciseSlug)">
+              <button class="btn btn-done" :disabled="!canMarkDone()" @click="markDone()">
+                I'm done with this exercise
+              </button>
+            </template>
+            <template x-if="isDone(db.activeUserId, currentModuleSlug, currentExerciseSlug)">
+              <div class="row" style="gap: 1rem">
+                <span class="tag tag-done">✓ Marked done</span>
+                <template x-if="!isRevealed(currentModuleSlug)">
+                  <button class="btn btn-ghost" @click="unmarkDone()">Edit again</button>
+                </template>
+              </div>
+            </template>
+          </div>
+          <template x-if="!canMarkDone() && !isDone(db.activeUserId, currentModuleSlug, currentExerciseSlug)">
+            <p class="muted" style="font-size: 13px; margin-top: 0.5rem">
+              Answer the required question to mark this done. The optional questions are always yours to skip.
+            </p>
+          </template>
+        </main>
+      </template>
+
+      <!-- =================== REVEAL =================== -->
+      <template x-if="view === 'reveal' && currentModule">
+        <main class="app-shell" data-theme="purple">
+          <button class="btn btn-ghost" style="padding: 6px 14px; min-height: 0; margin-bottom: 1.5rem" @click="goDashboard()">
+            ← Dashboard
+          </button>
+          <p class="muted" x-text="'Module ' + currentModule.order + ' — ' + currentModule.name"></p>
+          <h1>Your answers, side by side</h1>
+          <p class="muted">
+            Revealed
+            <span x-text="new Date(db.reveals[currentModuleSlug].revealed_at).toLocaleDateString()"></span>.
+            Differences are gently highlighted — there are no right answers.
+          </p>
+
+          <!-- Claude observations -->
+          <template x-if="observationsLoading">
+            <div class="observations"><p style="margin: 0">Generating observations…</p></div>
+          </template>
+          <template x-if="!observationsLoading && observationLines(currentModuleSlug).length">
+            <div class="observations">
+              <h3>A few things worth talking about</h3>
+              <ul>
+                <template x-for="(line, i) in observationLines(currentModuleSlug)" :key="i">
+                  <li x-text="line"></li>
+                </template>
+              </ul>
+            </div>
+          </template>
+          <template x-if="!observationsLoading && !observationLines(currentModuleSlug).length">
+            <div class="observations fallback">
+              <p style="margin: 0">
+                Reflections unavailable right now — you might not have a strong connection. Your answers
+                are all saved.
+              </p>
+            </div>
+          </template>
+
+          <!-- side by side per exercise -->
+          <template x-for="ex in currentModule.exercises" :key="ex.slug">
+            <section class="section" style="margin-top: 2.5rem">
+              <h2 x-text="ex.number + ' — ' + ex.title"></h2>
+
+              <!-- required question(s) -->
+              <template x-for="q in ex.required" :key="q.id">
+                <div>
+                  <template x-if="ex.kind === 'text'">
+                    <p class="answer-q" x-text="q.prompt"></p>
+                  </template>
+                  <div class="reveal-pair">
+                    <div class="answer-col" :class="{ differ: answersDiffer(currentModuleSlug, ex, q.id, 'required') }">
+                      <h4><span class="avatar me" style="width: 22px; height: 22px; font-size: 11px" x-text="initials(me)"></span> <span x-text="(me && me.name) || 'You'"></span></h4>
+                      <div class="answer-text" x-text="revealAnswerText(me.id, currentModuleSlug, ex, q.id, 'required') || '—'"></div>
+                    </div>
+                    <div class="answer-col" :class="{ differ: answersDiffer(currentModuleSlug, ex, q.id, 'required') }">
+                      <h4><span class="avatar partner" style="width: 22px; height: 22px; font-size: 11px" x-text="initials(partner)"></span> <span x-text="partner ? partner.name : 'Partner'"></span></h4>
+                      <div class="answer-text" x-text="revealAnswerText(partner.id, currentModuleSlug, ex, q.id, 'required') || '—'"></div>
+                    </div>
+                  </div>
+                </div>
+              </template>
+
+              <!-- optional answers if either filled -->
+              <template x-for="q in ex.optional" :key="q.id">
+                <template x-if="revealAnswerText(me.id, currentModuleSlug, ex, q.id, 'optional') || (partner && revealAnswerText(partner.id, currentModuleSlug, ex, q.id, 'optional'))">
+                  <div>
+                    <p class="answer-q" style="color: #666" x-text="q.prompt"></p>
+                    <div class="reveal-pair">
+                      <div class="answer-col">
+                        <div class="answer-text" x-text="revealAnswerText(me.id, currentModuleSlug, ex, q.id, 'optional') || '—'"></div>
+                      </div>
+                      <div class="answer-col">
+                        <div class="answer-text" x-text="(partner && revealAnswerText(partner.id, currentModuleSlug, ex, q.id, 'optional')) || '—'"></div>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </template>
+
+              <!-- reflections -->
+              <div style="margin-top: 1rem">
+                <template x-for="r in reflectionsFor(ex.slug)" :key="r.id">
+                  <div class="reflection">
+                    <div class="who" x-text="userName(r.user_id) + ' reflected:'"></div>
+                    <div class="answer-text" x-text="r.reflection"></div>
+                    <template x-if="r.claude_response">
+                      <div class="observations" style="margin-top: 0.75rem; padding: 0.75rem 1rem">
+                        <template x-for="(line, i) in r.claude_response.split(/\n+/).filter(l=>l.trim())" :key="i">
+                          <p style="margin: 0 0 0.4rem" x-text="line.replace(/^[-*\d.\s]+/, '')"></p>
+                        </template>
+                      </div>
+                    </template>
+                  </div>
+                </template>
+                <div class="reflection-input">
+                  <label class="field-label" style="font-size: 14px" :for="'refl-' + ex.slug">
+                    Add a reflection (no deadline — additions, not edits)
+                  </label>
+                  <textarea :id="'refl-' + ex.slug" x-model="reflectionDrafts[ex.slug]" style="min-height: 70px"
+                    placeholder="What shifted for you reading this together?"></textarea>
+                  <button class="btn btn-reveal" style="margin-top: 0.5rem"
+                    :disabled="!(reflectionDrafts[ex.slug] && reflectionDrafts[ex.slug].trim())"
+                    @click="addReflection(currentModuleSlug, ex.slug)">Save reflection</button>
+                </div>
+              </div>
+            </section>
+          </template>
+        </main>
+      </template>
+
+      <!-- =================== ARCHIVE =================== -->
+      <template x-if="view === 'archive'">
+        <main class="app-shell stack" data-theme="purple">
+          <button class="btn btn-ghost" style="padding: 6px 14px; min-height: 0" @click="goDashboard()">
+            ← Dashboard
+          </button>
+          <h1>Archive</h1>
+          <template x-if="!Object.keys(db.reveals).length">
+            <p class="muted">Nothing revealed yet. Once you both finish a module and reveal, it will live here.</p>
+          </template>
+          <template x-for="mod in modules" :key="mod.slug">
+            <template x-if="isRevealed(mod.slug)">
+              <section class="card" :data-theme="mod.color">
+                <h2 x-text="'Module ' + mod.order + ' — ' + mod.name"></h2>
+                <p class="muted">
+                  Revealed
+                  <span x-text="new Date(db.reveals[mod.slug].revealed_at).toLocaleDateString()"></span>
+                </p>
+                <button class="btn btn-reveal" @click="openReveal(mod.slug)" data-theme="purple">
+                  Open
+                </button>
+              </section>
+            </template>
+          </template>
+        </main>
+      </template>
+    </div>
+
+    <!-- Supabase JS (used only when configured; harmless in demo) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <!-- App scripts (order matters) -->
+    <script src="js/config.js"></script>
+    <script src="js/content.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/backend.js"></script>
+    <script src="js/app.js"></script>
+    <!-- Alpine last so x-data components are defined -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
+  </body>
+</html>
