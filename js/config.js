@@ -7,7 +7,7 @@
 // Fill them in to enable Supabase auth, sync, and Claude observations.
 
 window.RLP_CONFIG = {
-  supabaseUrl: "", // e.g. "https://abcd1234.supabase.co"
-  supabaseAnonKey: "", // public anon key from Supabase project settings
-  edgeFunctionUrl: "", // e.g. "https://abcd1234.supabase.co/functions/v1/claude"
+  supabaseUrl: "https://zsviczmjbclyvwrwrrsz.supabase.co",
+  supabaseAnonKey: "sb_publishable_WjEmqf6Ey9pTO7LVLnQSuQ_D2NNuW9d", // public publishable key
+  edgeFunctionUrl: "https://zsviczmjbclyvwrwrrsz.supabase.co/functions/v1/claude",
 };

@@ -142,8 +142,52 @@ $$;
 
 Notes:
 - Partner answers are hidden until a `reveals` row exists for that couple+module — privacy is enforced by the database, not just the UI.
-- Creating a couple: insert into `couples`, then `update users set couple_id = ...` for yourself.
+- Creating a couple: call `supabase.rpc('create_couple', { p_name, p_birth_year })` (see RPC below).
 - Joining: call `supabase.rpc('join_couple', { code })`.
+
+### Extra RPC — partner progress (run this too)
+
+So the dashboard can show "your partner has finished this" / "you're both ready"
+*without* leaking partner answers before the reveal, add this function that
+returns only done-flags (no answer text):
+
+```sql
+create or replace function partner_done_status()
+returns table(module text, exercise_slug text, marked_done boolean)
+language sql stable security definer set search_path = public as $$
+  select er.module, er.exercise_slug, (er.marked_done_at is not null)
+  from exercise_responses er
+  join users me on me.id = auth.uid()
+  where er.couple_id = me.couple_id
+    and er.user_id <> auth.uid();
+$$;
+```
+
+### Extra RPC — create a couple (run this too)
+
+RLS only lets you read a couple you already belong to, so the creator can't read
+back the row they just inserted. This function creates the couple and links the
+creator in one atomic step, returning the invite code:
+
+```sql
+create or replace function create_couple(p_name text, p_birth_year int)
+returns text
+language plpgsql security definer set search_path = public as $$
+declare
+  new_code text;
+  cid uuid;
+begin
+  loop
+    new_code := upper(substr(md5(random()::text), 1, 6));
+    exit when not exists (select 1 from couples where invite_code = new_code);
+  end loop;
+  insert into couples (invite_code) values (new_code) returning id into cid;
+  update users set couple_id = cid, name = p_name, birth_year = p_birth_year
+    where id = auth.uid();
+  return new_code;
+end;
+$$;
+```
 
 ---
 
