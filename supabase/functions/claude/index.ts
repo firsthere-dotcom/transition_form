@@ -30,24 +30,19 @@ function json(body: unknown, status = 200) {
 
 // ---- prompt builders (text drawn from transition-form-plan.md) ----
 
-function answersToText(answers: Record<string, unknown>): string {
-  // answers shape: { required: {...} | {order:[...]}, optional: {...} }
-  const lines: string[] = [];
-  const req = (answers?.required ?? {}) as Record<string, unknown>;
-  if (Array.isArray((req as any).order)) {
-    (req as any).order.forEach((c: string, i: number) => lines.push(`${i + 1}. ${c}`));
-  } else {
-    for (const v of Object.values(req)) if (v) lines.push(String(v));
-  }
-  const opt = (answers?.optional ?? {}) as Record<string, unknown>;
-  for (const v of Object.values(opt)) if (v) lines.push(`(further) ${String(v)}`);
-  return lines.join("\n") || "(no answer)";
+// Render question/answer pairs so Claude sees what each answer responds to.
+// pairs shape: [{ q: "question prompt", a: "answer text" }, ...]
+function qaToText(pairs: any[]): string {
+  if (!pairs || !pairs.length) return "  (no answer)";
+  return pairs
+    .map((p) => `  Q: ${p.q}\n  A: ${String(p.a).replace(/\n/g, "\n     ")}`)
+    .join("\n");
 }
 
 function buildRevealPrompt(p: any): string {
   const pack = (who: any) =>
     (who.answers || [])
-      .map((e: any) => `  ${e.exercise}:\n${answersToText(e.answers)}`)
+      .map((e: any) => `  ${e.exercise}:\n${qaToText(e.qa)}`)
       .join("\n\n");
   return (
     `Two partners have completed the ${p.moduleName} module. Here are their answers:\n\n` +
@@ -68,9 +63,12 @@ function buildReflectionPrompt(p: any): string {
   const refl = (p.reflections || [])
     .map((r: any) => `${r.who}: ${r.text}`)
     .join("\n");
+  const orig = (who: any) =>
+    who && who.qa && who.qa.length ? qaToText(who.qa) : "  (none)";
   return (
     `Two partners completed the ${p.exerciseName} exercise and have now added post-reveal reflections.\n\n` +
-    `Original answers:\n${p.partner1Original || "(none)"}\n---\n${p.partner2Original || "(none)"}\n\n` +
+    `${p.partner1?.name || "Partner 1"}'s original answers:\n${orig(p.partner1)}\n\n` +
+    `${p.partner2?.name || "Partner 2"}'s original answers:\n${orig(p.partner2)}\n\n` +
     `Reflections added so far:\n${refl || "(none)"}\n\n` +
     `Generate 2-3 short observations noticing what has shifted, what seems to be converging between them, ` +
     `and what remains unresolved or worth exploring further. Tone: observational, not directive. ` +

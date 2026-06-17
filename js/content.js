@@ -233,7 +233,7 @@ window.MODULES = [
         intro:
           "We all say we know what matters to us. But where we actually spend money tells a different story. Money Dials \u2014 a concept from Ramit Sethi \u2014 are the categories of life where spending genuinely makes you happier. The exercise isn't about budgeting. It's about discovering what you actually value when you're honest about it, and whether your partner values the same things. There are no right answers \u2014 only true ones.",
         rankingPrompt:
-          "Rank the following 10 categories from most to least important for how you want to spend money and energy in your Rich Life.",
+          "Rank these 10 categories by how much you'd want to spend money and energy on each in your Rich Life \u2014 from what you'd most want to spend on, down to least. This is about where your money would actually go, not which categories are \u201cbetter,\u201d more worthy, or morally higher.",
         categories: [
           "Travel and exploration",
           "Health and wellbeing",

@@ -487,12 +487,31 @@ function app() {
         this.persist();
       }
     },
+    // Pair each answered question with its prompt text so Claude has full
+    // context (rather than a bare list of answers with no questions).
+    exerciseQA(userId, moduleSlug, ex) {
+      const pairs = [];
+      if (ex.kind === "ranking") {
+        const a = this.revealAnswerText(userId, moduleSlug, ex, "required", "required");
+        if (a) pairs.push({ q: ex.rankingPrompt, a });
+      } else {
+        (ex.required || []).forEach((q) => {
+          const a = this.revealAnswerText(userId, moduleSlug, ex, q.id, "required");
+          if (a) pairs.push({ q: q.prompt, a });
+        });
+      }
+      (ex.optional || []).forEach((q) => {
+        const a = this.revealAnswerText(userId, moduleSlug, ex, q.id, "optional");
+        if (a) pairs.push({ q: q.prompt, a });
+      });
+      return pairs;
+    },
     buildRevealPayload(moduleSlug) {
       const mod = window.getModule(moduleSlug);
       const pack = (userId) =>
         mod.exercises.map((ex) => ({
           exercise: ex.title,
-          answers: this.responseFor(userId, moduleSlug, ex.slug)?.answers || {},
+          qa: this.exerciseQA(userId, moduleSlug, ex),
         }));
       return {
         moduleName: mod.name,
@@ -513,7 +532,7 @@ function app() {
     revealAnswerText(userId, moduleSlug, ex, qid, group) {
       const r = this.responseFor(userId, moduleSlug, ex.slug);
       if (!r) return "";
-      if (ex.kind === "ranking") {
+      if (ex.kind === "ranking" && group === "required") {
         const order = (r.answers.required && r.answers.required.order) || ex.categories;
         return order.map((c, i) => `${i + 1}. ${c}`).join("\n");
       }
@@ -579,10 +598,10 @@ function app() {
       const ex = window.getExercise(moduleSlug, exerciseSlug);
       return {
         exerciseName: ex.title,
-        partner1Original: this.revealAnswerText(this.me.id, moduleSlug, ex, "required", "required"),
-        partner2Original: this.partner
-          ? this.revealAnswerText(this.partner.id, moduleSlug, ex, "required", "required")
-          : "",
+        partner1: { name: this.me.name, qa: this.exerciseQA(this.me.id, moduleSlug, ex) },
+        partner2: this.partner
+          ? { name: this.partner.name, qa: this.exerciseQA(this.partner.id, moduleSlug, ex) }
+          : { name: "Partner", qa: [] },
         reflections: this.reflectionsFor(exerciseSlug).map((r) => ({
           who: this.db.users[r.user_id] ? this.db.users[r.user_id].name : "Partner",
           text: r.reflection,
