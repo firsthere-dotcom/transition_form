@@ -21,6 +21,7 @@ function app() {
     editingName: false,
     nameEditValue: "",
     resetStep: 0,
+    resetConfirmText: "",
     rankError: "",
     dragIndex: null,
     observationsLoading: false,
