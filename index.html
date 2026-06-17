@@ -37,9 +37,6 @@
                 </select>
               </label>
             </template>
-            <button class="btn btn-ghost" style="padding: 6px 14px; min-height: 0" @click="goArchive()">
-              Archive
-            </button>
             <button class="btn btn-ghost" style="padding: 6px 14px; min-height: 0" @click="signOut()">
               Sign out
             </button>
@@ -536,31 +533,6 @@
       </template>
 
       <!-- =================== ARCHIVE =================== -->
-      <template x-if="view === 'archive'">
-        <main class="app-shell stack" data-theme="purple">
-          <button class="btn btn-ghost" style="padding: 6px 14px; min-height: 0" @click="goDashboard()">
-            ← Dashboard
-          </button>
-          <h1>Archive</h1>
-          <template x-if="!Object.keys(db.reveals).length">
-            <p class="muted">Nothing revealed yet. Once you both finish a module and reveal, it will live here.</p>
-          </template>
-          <template x-for="mod in modules" :key="mod.slug">
-            <template x-if="isRevealed(mod.slug)">
-              <section class="card" :data-theme="mod.color">
-                <h2 x-text="'Module ' + mod.order + ' — ' + mod.name"></h2>
-                <p class="muted">
-                  Revealed
-                  <span x-text="new Date(db.reveals[mod.slug].revealed_at).toLocaleDateString()"></span>
-                </p>
-                <button class="btn btn-reveal" @click="openReveal(mod.slug)" data-theme="purple">
-                  Open
-                </button>
-              </section>
-            </template>
-          </template>
-        </main>
-      </template>
     </div>
 
     <!-- Supabase JS (used only when configured; harmless in demo) -->

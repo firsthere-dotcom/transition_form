@@ -208,9 +208,6 @@ function app() {
       this.currentModuleSlug = null;
       this.currentExerciseSlug = null;
     },
-    goArchive() {
-      this.view = "archive";
-    },
     openExercise(moduleSlug, exerciseSlug) {
       this.currentModuleSlug = moduleSlug;
       this.currentExerciseSlug = exerciseSlug;
