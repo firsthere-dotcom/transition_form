@@ -179,6 +179,12 @@ window.Backend = {
     await c.from("users").update({ name }).eq("id", appCtx.db.activeUserId);
   },
 
+  async resetCouple() {
+    const c = this.client();
+    const { error } = await c.rpc("reset_couple");
+    if (error) { console.warn("resetCouple failed", error); throw error; }
+  },
+
   // ---------------------------------------------------------------
   // WRITES
   async createCouple(appCtx, name) {

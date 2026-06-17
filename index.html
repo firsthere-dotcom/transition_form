@@ -175,6 +175,40 @@
             </template>
           </section>
 
+          <!-- reset -->
+          <template x-if="!isDemo">
+            <div style="text-align: center; margin-top: 0.5rem">
+              <template x-if="resetStep === 0">
+                <button class="btn btn-ghost" style="font-size: 13px; opacity: 0.6" @click="resetStep = 1">
+                  Start over with a new partner
+                </button>
+              </template>
+              <template x-if="resetStep === 1">
+                <div class="card" style="max-width: 380px; margin: 0 auto; text-align: left">
+                  <p style="margin: 0 0 0.75rem; font-weight: 600">Are you sure?</p>
+                  <p class="muted" style="font-size: 13px; margin: 0 0 1rem">This will permanently delete all your answers, reveals, and reflections and unlink both partners. This cannot be undone.</p>
+                  <div class="row" style="gap: 0.75rem">
+                    <button class="btn btn-ghost" @click="resetStep = 0">Cancel</button>
+                    <button class="btn" style="background: #c0392b; color: #fff" @click="resetStep = 2">Yes, delete everything</button>
+                  </div>
+                </div>
+              </template>
+              <template x-if="resetStep === 2">
+                <div class="card" style="max-width: 380px; margin: 0 auto; text-align: left">
+                  <p style="margin: 0 0 0.75rem; font-weight: 600">Last chance — this is permanent.</p>
+                  <p class="muted" style="font-size: 13px; margin: 0 0 1rem">Type <strong>reset</strong> to confirm.</p>
+                  <input type="text" x-ref="resetConfirm" placeholder="reset" style="margin-bottom: 0.75rem; padding: 6px 10px; border: 1.5px solid #ccc; border-radius: 6px; width: 100%" />
+                  <div class="row" style="gap: 0.75rem">
+                    <button class="btn btn-ghost" @click="resetStep = 0">Cancel</button>
+                    <button class="btn" style="background: #c0392b; color: #fff"
+                      :disabled="$refs.resetConfirm?.value !== 'reset'"
+                      @click="resetCouple()">Delete and start over</button>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </template>
+
           <!-- modules -->
           <template x-for="mod in modules" :key="mod.slug">
             <section class="module-card" :data-theme="mod.color">

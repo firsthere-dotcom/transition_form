@@ -20,6 +20,7 @@ function app() {
     onboard: { name: "", mode: "create", code: "" },
     editingName: false,
     nameEditValue: "",
+    resetStep: 0,
     rankError: "",
     dragIndex: null,
     observationsLoading: false,
@@ -630,6 +631,24 @@ function app() {
     },
 
     // ---------------- sign out / reset ----------------
+    async resetCouple() {
+      if (this.isLive) {
+        try {
+          await window.Backend.resetCouple();
+        } catch (e) {
+          alert("Reset failed. Please try again.");
+          this.resetStep = 0;
+          return;
+        }
+      }
+      this.resetStep = 0;
+      window.Storage.clear();
+      this.db = window.emptyDb();
+      this.db.settings.demoMode = false;
+      // Reload so onSignedIn re-runs and lands on onboarding.
+      window.location.reload();
+    },
+
     async saveName() {
       const name = this.nameEditValue.trim();
       if (!name) return;
