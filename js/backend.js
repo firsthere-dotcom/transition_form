@@ -173,11 +173,11 @@ window.Backend = {
 
   // ---------------------------------------------------------------
   // WRITES
-  async createCouple(appCtx, name, birthYear) {
+  async createCouple(appCtx, name) {
     const c = this.client();
     // Atomic via RPC: inserts the couple and links the user in one step,
     // sidestepping the RLS chicken-and-egg (can't read a couple you don't yet belong to).
-    const { error } = await c.rpc("create_couple", { p_name: name, p_birth_year: birthYear });
+    const { error } = await c.rpc("create_couple", { p_name: name, p_birth_year: null });
     if (error) {
       console.warn("createCouple failed", error);
       throw error;
@@ -185,11 +185,10 @@ window.Backend = {
     await this.loadAll(appCtx);
   },
 
-  async joinCouple(appCtx, name, birthYear, code) {
+  async joinCouple(appCtx, name, code) {
     const c = this.client();
     const meId = appCtx.db.activeUserId;
-    // set profile first
-    await c.from("users").update({ name, birth_year: birthYear }).eq("id", meId);
+    await c.from("users").update({ name }).eq("id", meId);
     const { error } = await c.rpc("join_couple", { code: code });
     if (error) {
       console.warn("joinCouple failed", error);

@@ -17,7 +17,7 @@ function app() {
     saveHint: "",
     saveTimer: null,
     joinCode: "",
-    onboard: { name: "", birth_year: "", mode: "create", code: "" },
+    onboard: { name: "", mode: "create", code: "" },
     rankError: "",
     dragIndex: null,
     observationsLoading: false,
@@ -128,14 +128,13 @@ function app() {
       const me = this.me;
       if (!me) return;
       const name = this.onboard.name.trim();
-      const birthYear = parseInt(this.onboard.birth_year, 10) || null;
 
       if (this.isLive) {
         try {
           if (this.onboard.mode === "create") {
-            await window.Backend.createCouple(this, name, birthYear);
+            await window.Backend.createCouple(this, name);
           } else {
-            await window.Backend.joinCouple(this, name, birthYear, this.onboard.code.trim().toUpperCase());
+            await window.Backend.joinCouple(this, name, this.onboard.code.trim().toUpperCase());
           }
           this.view = "dashboard";
         } catch (e) {
@@ -149,7 +148,6 @@ function app() {
       }
 
       me.name = name;
-      me.birth_year = birthYear;
       if (this.onboard.mode === "create") {
         const couple = {
           id: window.uid(),

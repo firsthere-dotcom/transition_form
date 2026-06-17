@@ -89,10 +89,6 @@
               <label class="field-label" for="ob-name">Your name</label>
               <input id="ob-name" type="text" x-model="onboard.name" placeholder="First name" />
             </div>
-            <div>
-              <label class="field-label" for="ob-year">Birth year</label>
-              <input id="ob-year" type="number" x-model="onboard.birth_year" placeholder="e.g. 1978" />
-            </div>
           </div>
 
           <div class="card stack">
@@ -125,7 +121,7 @@
           <div>
             <button
               class="btn btn-reveal"
-              :disabled="!onboard.name.trim() || !onboard.birth_year"
+              :disabled="!onboard.name.trim()"
               @click="completeOnboarding()"
             >
               Continue
