@@ -396,11 +396,12 @@ function app() {
       }
       this.goDashboard();
     },
-    unmarkDone() {
+    async unmarkDone() {
       const r = this.responseFor(this.db.activeUserId, this.currentModuleSlug, this.currentExerciseSlug);
       if (r) {
         r.marked_done_at = null;
         this.persist();
+        if (this.isLive) await window.Backend.upsertResponse(this, this.currentModuleSlug, this.currentExerciseSlug);
       }
     },
 
