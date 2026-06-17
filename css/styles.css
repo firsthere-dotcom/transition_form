@@ -703,6 +703,17 @@ input.rank-input {
   opacity: 0.85;
 }
 
+.name-edit-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #aaa;
+  font-size: 13px;
+  padding: 0 0 0 4px;
+  line-height: 1;
+}
+.name-edit-btn:hover { color: #555; }
+
 .invite-code {
   font-size: 28px;
   font-weight: 700;

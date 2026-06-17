@@ -18,6 +18,8 @@ function app() {
     saveTimer: null,
     joinCode: "",
     onboard: { name: "", mode: "create", code: "" },
+    editingName: false,
+    nameEditValue: "",
     rankError: "",
     dragIndex: null,
     observationsLoading: false,
@@ -628,6 +630,17 @@ function app() {
     },
 
     // ---------------- sign out / reset ----------------
+    async saveName() {
+      const name = this.nameEditValue.trim();
+      if (!name) return;
+      const me = this.me;
+      if (!me) return;
+      me.name = name;
+      this.editingName = false;
+      this.persist();
+      if (this.isLive) await window.Backend.updateName(this, name);
+    },
+
     async signOut() {
       if (this.isLive && window.Backend.signOut) {
         await window.Backend.signOut();

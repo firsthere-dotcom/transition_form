@@ -85,6 +85,9 @@ window.Backend = {
       await this.loadAll(appCtx);
       appCtx.view = "dashboard";
     } else {
+      // Pre-fill name from Google profile so the field arrives populated.
+      const googleName = authUser.user_metadata?.full_name || authUser.user_metadata?.name || "";
+      if (googleName && !appCtx.onboard.name) appCtx.onboard.name = googleName;
       appCtx.view = "onboarding";
     }
   },
@@ -169,6 +172,11 @@ window.Backend = {
   async signOut() {
     const c = this.client();
     if (c) await c.auth.signOut();
+  },
+
+  async updateName(appCtx, name) {
+    const c = this.client();
+    await c.from("users").update({ name }).eq("id", appCtx.db.activeUserId);
   },
 
   // ---------------------------------------------------------------
