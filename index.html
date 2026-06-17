@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Rich Life Planner</title>
+    <title>Transition and Rich Life Planner</title>
     <meta
       name="description"
       content="A couples' web app for designing the second half of life together."
@@ -21,7 +21,7 @@
       <!-- =================== TOP BAR =================== -->
       <template x-if="view !== 'signin'">
         <header class="topbar">
-          <div class="brand" @click="goDashboard()">Rich Life Planner</div>
+          <div class="brand" @click="goDashboard()">Transition and Rich Life Planner</div>
           <div class="row" style="gap: 0.75rem">
             <!-- demo: acting-as switcher -->
             <template x-if="isDemo && couple && coupleMembers().length > 1">
@@ -50,7 +50,7 @@
       <!-- =================== SIGN IN =================== -->
       <template x-if="view === 'signin'">
         <main class="signin-wrap stack">
-          <h1>Rich Life Planner</h1>
+          <h1>Transition and Rich Life Planner</h1>
           <p class="muted">
             A space for two partners to design the second half of life together — answered
             independently, revealed together.
@@ -59,10 +59,17 @@
             <button class="google-btn" @click="signInGoogle()">
               <span style="font-weight: 700">G</span> Sign in with Google
             </button>
-            <button class="btn btn-ghost" @click="signInDemo()">Continue in demo mode</button>
-            <p class="muted" style="font-size: 13px">
-              Demo mode runs entirely in your browser — no account, no server. Perfect for trying the
-              full flow, including the reveal.
+            <p class="muted" style="font-size: 13px; margin-top: 0.25rem">
+              Sign in to save your answers and connect with your partner.
+            </p>
+          </div>
+
+          <div class="signin-demo">
+            <button class="btn btn-ghost btn-demo" @click="signInDemo()">
+              Continue in demo mode
+            </button>
+            <p class="muted" style="font-size: 12px">
+              Optional — just for trying it out. Runs entirely in your browser with no account.
             </p>
           </div>
         </main>

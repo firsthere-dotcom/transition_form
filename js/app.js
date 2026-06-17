@@ -513,7 +513,7 @@ function app() {
     revealAnswerText(userId, moduleSlug, ex, qid, group) {
       const r = this.responseFor(userId, moduleSlug, ex.slug);
       if (!r) return "";
-      if (ex.kind === "ranking") {
+      if (ex.kind === "ranking" && group === "required") {
         const order = (r.answers.required && r.answers.required.order) || ex.categories;
         return order.map((c, i) => `${i + 1}. ${c}`).join("\n");
       }
